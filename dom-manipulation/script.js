@@ -1,32 +1,32 @@
-let quote1 = {quoteText: 'Live life to the fullest',
-    quoteCategory: 'Motivation'
+let quote1 = {text: 'Live life to the fullest',
+    category: 'Motivation'
 };
 
-let quote2 = {quoteText: 'Jesus has got you',
-    quoteCategory: 'Assurance'
+let quote2 = {text: 'Jesus has got you',
+    category: 'Assurance'
 };
 
 let quotes = [quote1, quote2];
 
-function showRandomQuote() {
+function displayRandomQuote() {
     let max = quotes.length;
     let randomNumber = Math.floor(Math.random() * (max));
 
-    let randomQuote = quotes[randomNumber].quoteText;
+    let randomQuote = quotes[randomNumber].text;
 
     const displayQuote = document.getElementById('quoteDisplay');
     displayQuote.innerHTML = randomQuote;
 }
 
 const quoteDisplayer = document.getElementById('newQuote');
-quoteDisplayer.addEventListener('click', showRandomQuote);
+quoteDisplayer.addEventListener('click', displayRandomQuote);
 
 function addQuote() {
-    const quoteText = document.getElementById('newQuoteText').value.trim();
-    const quoteCategory = document.getElementById('newQuoteCategory').value.trim();
+    const text = document.getElementById('newQuoteText').value.trim();
+    const category = document.getElementById('newQuoteCategory').value.trim();
     let quote = {
-        quoteText,
-        quoteCategory
+        text,
+        category
     };
 
     document.getElementById('newQuoteText').value = '';
