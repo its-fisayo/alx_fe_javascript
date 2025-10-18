@@ -8,7 +8,7 @@ let quote2 = {text: 'Jesus has got you',
 
 let quotes = [quote1, quote2];
 
-function displayRandomQuote() {
+function showRandomQuote() {
     let max = quotes.length;
     let randomNumber = Math.floor(Math.random() * (max));
 
@@ -19,7 +19,7 @@ function displayRandomQuote() {
 }
 
 const quoteDisplayer = document.getElementById('newQuote');
-quoteDisplayer.addEventListener('click', displayRandomQuote);
+quoteDisplayer.addEventListener('click', showRandomQuote);
 
 function addQuote() {
     const text = document.getElementById('newQuoteText').value.trim();
