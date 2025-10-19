@@ -1,3 +1,6 @@
+const LS_KEY = 'dynamic_quotes_v1';
+const SS_LAST_QUOTE_KEY = 'dynamic_quotes_last_viewed';
+
 let quote1 = {text: 'Live life to the fullest',
     category: 'Motivation'
 };
@@ -14,6 +17,8 @@ const SAMPLE_QUOTES = [
     { text: "Life is what happens when you’re busy making other plans.", category: "Life" }
 ];
 
+const quoteDisplayer = document.getElementById('newQuote');
+const categorySelect = document.getElementById('categoryFilter');
 const displayQuote = document.getElementById('quoteDisplay');
 const quoteParagraph = document.createElement('p');
 displayQuote.appendChild(quoteParagraph);
@@ -26,9 +31,6 @@ function saveQuotes() {
         alert('Error: Could not save quotes to local storage.');
     }
 }
-
-const LS_KEY = 'dynamic_quotes_v1';
-const SS_LAST_QUOTE_KEY = 'dynamic_quotes_last_viewed';
 
 function loadQuotesFromStorage() {
   try {
@@ -54,12 +56,44 @@ function loadQuotesFromStorage() {
   }
 }
 
-function showRandomQuote() {
-    let max = quotes.length;
-    let randomNumber = Math.floor(Math.random() * (max));
+function populateCategories() {
+    const categories = Array.from(new Set(quotes.map(q => q.category))).sort((a,b)=>a.localeCompare(b));
+    categorySelect.innerHTML = '<option value="all">All Categories</option>';
+    categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        categorySelect.appendChild(opt);
+    });
 
-    let randomQuote = `"${quotes[randomNumber].text}" - (${quotes[randomNumber].category})`;
-    let q = quotes[randomNumber];
+    // Restore last selected category if it exists
+    const lastFilter = localStorage.getItem('last_selected_category');
+    if (lastFilter && [...categorySelect.options].some(opt => opt.value === lastFilter)) {
+        categorySelect.value = lastFilter;
+    }
+}
+
+function filterQuotes() {
+    const selectedCategory = categorySelect.value;
+    localStorage.setItem('last_selected_category', selectedCategory); // save last selected category
+}
+
+function showRandomQuote() {
+    let filtered = quotes;
+    const sel = categorySelect.value;
+    if (sel !== 'all') filtered = quotes.filter(q => q.category === sel);
+
+    if (filtered.length === 0) {
+        quoteDisplay.textContent = 'No quotes available in this category yet!';
+        sessionStorage.removeItem(SS_LAST_QUOTE_KEY);
+        updateLastViewedInfo();
+        return;
+    }
+
+    let max = filtered.length;
+    let randomNumber = Math.floor(Math.random() * (max));
+    let randomQuote = `"${filtered[randomNumber].text}" - (${filtered[randomNumber].category})`;
+    let q = filtered[randomNumber];
 
     quoteParagraph.innerHTML = randomQuote;
 
@@ -90,10 +124,7 @@ function updateLastViewedInfo() {
   }
 }
 
-
-const quoteDisplayer = document.getElementById('newQuote');
 quoteDisplayer.addEventListener('click', showRandomQuote);
-
 
 function createAddQuoteForm() {
     const text = document.getElementById('newQuoteText').value.trim();
@@ -108,6 +139,7 @@ function createAddQuoteForm() {
     quotes.push(quote);
 
     saveQuotes();
+    populateCategories();
 }
 
 function exportQuotesToJson() {
@@ -168,6 +200,7 @@ function importFromJsonFile(event) {
       });
 
       saveQuotes();
+      populateCategories();
       importFile.value = '';
 
       alert(`Imported ${valid.length} items. ${added} new quotes added (duplicates skipped).`);
@@ -191,6 +224,7 @@ function clearSavedQuotes() {
   if (!confirm('This will delete all saved quotes and reset to defaults. Proceed?')) return;
   localStorage.removeItem(LS_KEY);
   loadQuotesFromStorage();
+  populateCategories();
   quoteDisplay.textContent = 'Quotes reset to defaults.';
   sessionStorage.removeItem(SS_LAST_QUOTE_KEY);
   updateLastViewedInfo();
@@ -202,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadQuotesFromStorage();
 
   // Wire UI events
+  populateCategories();
   exportBtn.addEventListener('click', exportQuotesToJson);
   importFile.addEventListener('change', importFromJsonFile);
   clearStorageBtn.addEventListener('click', clearSavedQuotes);
