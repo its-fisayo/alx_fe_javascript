@@ -134,6 +134,9 @@ function createAddQuoteForm() {
         category
     };
 
+    const newId = 'l-' + Date.now();
+    const newQ = { id: newId, text, category, updatedAt: new Date().toISOString() };
+
     document.getElementById('newQuoteText').value = '';
     document.getElementById('newQuoteCategory').value = '';
     quotes.push(quote);
@@ -246,4 +249,247 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Optionally, show a random quote immediately (comment out if undesired)
   // showRandomQuote();
+});
+
+const SERVER_URL = 'https://jsonplaceholder.typicode.com/posts';
+
+const SYNC_INTERVAL = 30_000; // 30 seconds
+
+const LAST_SYNC_AT_KEY = 'dynamic_quotes_last_sync_at';
+
+let lastSyncAt = null;
+
+const syncNotification = document.getElementById('syncNotification');
+const syncMessage = document.getElementById('syncMessage');
+const openConflictsBtn = document.getElementById('openConflictsBtn');
+const dismissSyncBtn = document.getElementById('dismissSyncBtn');
+const conflictModal = document.getElementById('conflictModal');
+const conflictList = document.getElementById('conflictList');
+const applyResolutionsBtn = document.getElementById('applyResolutionsBtn');
+const closeConflictsBtn = document.getElementById('closeConflictsBtn');
+
+async function fetchServerQuotes() {
+  try {
+    const res = await fetch(SERVER_URL);
+    if (!res.ok) throw new Error('Server returned ' + res.status);
+    const data = await res.json();
+
+    // Normalize depending on server shape.
+    // JSONPlaceholder /posts have { id, title, body, userId } — we'll map:
+    // text -> title, category -> "user-{userId}"
+    // If your server already returns {id, text, category}, adapt accordingly.
+    const normalized = data.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        // handle JSONPlaceholder shape
+        if ('title' in item && 'body' in item) {
+          return {
+            id: 's-' + String(item.id),               // server-id prefix 's-'
+            text: item.title || item.body || '',
+            category: item.userId ? `user-${item.userId}` : 'Server',
+            updatedAt: new Date().toISOString()
+          };
+        }
+        // if already in quote shape:
+        if ('text' in item && 'category' in item) {
+          return {
+            id: item.id != null ? item.id : ('s-' + Math.random()),
+            text: item.text,
+            category: item.category,
+            updatedAt: item.updatedAt || new Date().toISOString()
+          };
+        }
+      }
+      return null;
+    }).filter(Boolean);
+
+    return normalized;
+  } catch (err) {
+    console.warn('fetchServerQuotes failed', err);
+    return null; // signal failure
+  }
+}
+
+/* merge: server -> local (server wins). Collect conflicts for user review.
+   conflict definition here: same id exists locally + server, but text/category differ.
+   If server item has id not present locally -> add it.
+*/
+function mergeServerData(serverQuotes) {
+  if (!Array.isArray(serverQuotes)) return;
+
+  const localById = new Map(quotes.map(q => [String(q.id), q]));
+  const newLocal = [...quotes]; // will modify
+
+  pendingConflicts = [];
+
+  serverQuotes.forEach(sq => {
+    const id = String(sq.id);
+    if (localById.has(id)) {
+      const local = localById.get(id);
+      // If different content, register conflict and by default accept server version (server-wins)
+      if (local.text !== sq.text || local.category !== sq.category) {
+        pendingConflicts.push({ local, server: sq });
+        // server-wins: replace local item in newLocal
+        const idx = newLocal.findIndex(x => String(x.id) === id);
+        if (idx !== -1) newLocal[idx] = { ...sq, updatedAt: new Date().toISOString() };
+      } // else identical -> nothing
+    } else {
+      // server item new -> add to local store
+      newLocal.push({ ...sq, updatedAt: sq.updatedAt || new Date().toISOString() });
+    }
+  });
+
+  // Optionally remove local items that server deleted? Here we keep local-only items.
+  quotes = newLocal;
+  saveQuotes();
+
+  // update last sync time
+  lastSyncAt = new Date().toISOString();
+  try { localStorage.setItem(LAST_SYNC_AT_KEY, lastSyncAt); } catch {}
+
+  // Notify user if there were conflicts or new items
+  if (pendingConflicts.length > 0) {
+    showSyncNotification(`${pendingConflicts.length} conflict(s) detected. Server versions applied (default).`);
+  } else {
+    showSyncNotification('Synced with server. No conflicts.');
+  }
+
+  populateCategories();
+}
+
+/* ---------- Notification & conflict UI ---------- */
+function showSyncNotification(msg) {
+  if (!syncNotification) return;
+  syncMessage.textContent = `${msg} (Last sync: ${lastSyncAt ? new Date(lastSyncAt).toLocaleTimeString() : 'now'})`;
+  syncNotification.style.display = 'block';
+}
+
+function hideSyncNotification() {
+  if (!syncNotification) return;
+  syncNotification.style.display = 'none';
+}
+
+// Build conflict list inside modal and let user choose keep-server / keep-local for each conflict
+function openConflictModal() {
+  if (!conflictModal || !conflictList) return;
+  conflictList.innerHTML = '';
+
+  if (pendingConflicts.length === 0) {
+    conflictList.textContent = 'No conflicts to resolve.';
+  } else {
+    pendingConflicts.forEach((c, idx) => {
+      const wrapper = document.createElement('div');
+      wrapper.style.borderBottom = '1px solid #eee';
+      wrapper.style.padding = '8px 0';
+
+      const heading = document.createElement('div');
+      heading.innerHTML = `<strong>Conflict #${idx+1}</strong>`;
+      wrapper.appendChild(heading);
+
+      const serverBlock = document.createElement('div');
+      serverBlock.innerHTML = `<em>Server:</em> "${escapeHtml(c.server.text)}" — (${escapeHtml(c.server.category)})`;
+      wrapper.appendChild(serverBlock);
+
+      const localBlock = document.createElement('div');
+      localBlock.innerHTML = `<em>Local:</em> "${escapeHtml(c.local.text)}" — (${escapeHtml(c.local.category)})`;
+      wrapper.appendChild(localBlock);
+
+      const radioKeep = document.createElement('div');
+      radioKeep.innerHTML = `
+        <label><input type="radio" name="conf-${idx}" value="server" checked> Keep server</label>
+        <label style="margin-left:12px;"><input type="radio" name="conf-${idx}" value="local"> Keep local</label>
+      `;
+      wrapper.appendChild(radioKeep);
+
+      conflictList.appendChild(wrapper);
+    });
+  }
+
+  conflictModal.style.display = 'block';
+}
+
+function closeConflictModal() {
+  if (!conflictModal) return;
+  conflictModal.style.display = 'none';
+}
+
+// When user applies manual resolutions, modify local quotes according to choices
+function applyConflictResolutions() {
+  if (!pendingConflicts.length) { closeConflictModal(); return; }
+
+  const resolutions = pendingConflicts.map((c, idx) => {
+    const chosen = document.querySelector(`input[name="conf-${idx}"]:checked`);
+    return chosen ? chosen.value : 'server';
+  });
+
+  resolutions.forEach((choice, idx) => {
+    const c = pendingConflicts[idx];
+    const id = String(c.server.id);
+    const localIndex = quotes.findIndex(q => String(q.id) === id);
+    if (choice === 'local') {
+      // keep local (do nothing because earlier merge applied server already),
+      // so we must re-instate local contents
+      if (localIndex !== -1) {
+        quotes[localIndex] = { ...c.local, updatedAt: new Date().toISOString() };
+      } else {
+        quotes.push({ ...c.local, updatedAt: new Date().toISOString() });
+      }
+    } else {
+      // keep server — already applied by merge, but ensure timestamp
+      if (localIndex !== -1) quotes[localIndex] = { ...c.server, updatedAt: new Date().toISOString() };
+      else quotes.push({ ...c.server, updatedAt: new Date().toISOString() });
+    }
+  });
+
+  // clear pending
+  pendingConflicts = [];
+  saveQuotes();
+  populateCategories();
+  closeConflictModal();
+  hideSyncNotification();
+  alert('Resolutions applied.');
+}
+
+/* ---------- Sync runner ---------- */
+async function runSyncCycle() {
+  const serverData = await fetchServerQuotes();
+
+  if (!serverData) {
+    // network error — optionally notify
+    console.log('Server fetch failed; skipping this cycle.');
+    return;
+  }
+
+  // merge server data into local state
+  mergeServerData(serverData);
+}
+
+/* start periodic polling */
+let syncIntervalHandle = null;
+function startAutoSync() {
+  // run immediately then interval
+  runSyncCycle();
+  syncIntervalHandle = setInterval(runSyncCycle, SYNC_INTERVAL);
+}
+function stopAutoSync() {
+  if (syncIntervalHandle) clearInterval(syncIntervalHandle);
+}
+
+/* ---------- Utilities ---------- */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* ---------- Wire UI ---------- */
+document.addEventListener('DOMContentLoaded', () => {
+  loadQuotesFromStorage();
+  populateCategories();
+  updateLastViewedInfo();
+
+  if (openConflictsBtn) openConflictsBtn.addEventListener('click', openConflictModal);
+  if (dismissSyncBtn) dismissSyncBtn.addEventListener('click', hideSyncNotification);
+  if (applyResolutionsBtn) applyResolutionsBtn.addEventListener('click', applyConflictResolutions);
+  if (closeConflictsBtn) closeConflictsBtn.addEventListener('click', closeConflictModal);
+
+  // start automatic syncing
+  startAutoSync();
 });

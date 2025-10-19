@@ -24,6 +24,23 @@
         <input type="file" id="importFile" accept=".json" />
         <button id="clearStorageBtn">Clear Saved Quotes</button>
     </div>
+
+        <!-- Sync notification -->
+    <div id="syncNotification">
+    <span id="syncMessage"></span>
+    <button id="openConflictsBtn">Resolve</button>
+    <button id="dismissSyncBtn">Dismiss</button>
+    </div>
+
+    <!-- Conflict resolution modal (hidden by default) -->
+    <div id="conflictModal">
+    <h3>Conflicts detected</h3>
+    <div id="conflictList"></div>
+    <div>
+        <button id="applyResolutionsBtn">Apply Resolutions</button>
+        <button id="closeConflictsBtn">Close</button>
+    </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
