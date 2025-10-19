@@ -479,6 +479,25 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
+// POST new quote to mock server
+async function postQuoteToServer(quote) {
+  try {
+    const response = await fetch('https://jsonplaceholder.typicode.com/posts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(quote)
+    });
+
+    const data = await response.json();
+    console.log('✅ Quote posted to server:', data);
+  } catch (error) {
+    console.error('❌ Failed to post quote to server:', error);
+  }
+}
+
+
 /* ---------- Wire UI ---------- */
 document.addEventListener('DOMContentLoaded', () => {
   loadQuotesFromStorage();
