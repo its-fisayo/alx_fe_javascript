@@ -350,7 +350,7 @@ function mergeServerData(serverQuotes) {
   if (pendingConflicts.length > 0) {
     showSyncNotification(`${pendingConflicts.length} conflict(s) detected. Server versions applied (default).`);
   } else {
-    showSyncNotification('Synced with server. No conflicts.');
+    showSyncNotification('Quotes synced with server!');
   }
 
   populateCategories();
