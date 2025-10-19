@@ -450,7 +450,7 @@ function applyConflictResolutions() {
 }
 
 /* ---------- Sync runner ---------- */
-async function runSyncCycle() {
+async function syncQuotes() {
   const serverData = await fetchQuotesFromServer();
 
   if (!serverData) {
@@ -467,8 +467,8 @@ async function runSyncCycle() {
 let syncIntervalHandle = null;
 function startAutoSync() {
   // run immediately then interval
-  runSyncCycle();
-  syncIntervalHandle = setInterval(runSyncCycle, SYNC_INTERVAL);
+  syncQuotes();
+  syncIntervalHandle = setInterval(syncQuotes, SYNC_INTERVAL);
 }
 function stopAutoSync() {
   if (syncIntervalHandle) clearInterval(syncIntervalHandle);
