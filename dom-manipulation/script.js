@@ -268,7 +268,7 @@ const conflictList = document.getElementById('conflictList');
 const applyResolutionsBtn = document.getElementById('applyResolutionsBtn');
 const closeConflictsBtn = document.getElementById('closeConflictsBtn');
 
-async function fetchServerQuotes() {
+async function fetchQuotesFromServer() {
   try {
     const res = await fetch(SERVER_URL);
     if (!res.ok) throw new Error('Server returned ' + res.status);
@@ -451,7 +451,7 @@ function applyConflictResolutions() {
 
 /* ---------- Sync runner ---------- */
 async function runSyncCycle() {
-  const serverData = await fetchServerQuotes();
+  const serverData = await fetchQuotesFromServer();
 
   if (!serverData) {
     // network error — optionally notify
